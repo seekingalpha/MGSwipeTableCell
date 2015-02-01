@@ -37,6 +37,7 @@
 
 @interface MGSwipeButtonsView : UIView
 @property (nonatomic, weak) MGSwipeTableCell * cell;
+@property (nonatomic, strong)  NSArray * buttons;  // iliya - added that to property
 @end
 
 @implementation MGSwipeButtonsView
@@ -493,6 +494,7 @@ static NSMutableSet * singleSwipePerTable;
 
 -(void) createSwipeViewIfNeeded
 {
+    [self fetchButtonsIfNeeded]; // iliya - added that in case that buttons weren't created
     if (!_swipeOverlay) {
         _swipeOverlay = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, self.bounds.size.height)];
         _swipeOverlay.hidden = YES;
@@ -505,22 +507,26 @@ static NSMutableSet * singleSwipePerTable;
         [_swipeOverlay addSubview:_swipeView];
         [self.contentView addSubview:_swipeOverlay];
     }
-    
-    [self fetchButtonsIfNeeded];
-    if (!_leftView && _leftButtons.count > 0) {
-        _leftView = [[MGSwipeButtonsView alloc] initWithButtons:_leftButtons direction:MGSwipeDirectionLeftToRight];
-        _leftView.autoresizingMask = UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleHeight;
-        _leftView.cell = self;
-        _leftView.frame = CGRectMake(-_leftView.bounds.size.width, 0, _leftView.bounds.size.width, _swipeOverlay.bounds.size.height);
-        [_swipeOverlay addSubview:_leftView];
-    }
-    if (!_rightView && _rightButtons.count > 0) {
-        _rightView = [[MGSwipeButtonsView alloc] initWithButtons:_rightButtons direction:MGSwipeDirectionRightToLeft];
-        _rightView.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleHeight;
-        _rightView.cell = self;
-        _rightView.frame = CGRectMake(_swipeOverlay.bounds.size.width, 0, _rightView.bounds.size.width, _swipeOverlay.bounds.size.height);
-        [_swipeOverlay addSubview:_rightView];
-    }
+}
+
+- (void) createLeftViewWithButtons:(BOOL)content // added that function
+{                                                // before that was running at createSwipeViewIfNeeded
+    [_leftView removeFromSuperview];
+    _leftView = [[MGSwipeButtonsView alloc] initWithButtons:(content) ? _leftButtons : nil direction:MGSwipeDirectionLeftToRight];
+    _leftView.autoresizingMask = UIViewAutoresizingFlexibleRightMargin | UIViewAutoresizingFlexibleHeight;
+    _leftView.cell = self;
+    _leftView.frame = CGRectMake(-_leftView.bounds.size.width, 0, _leftView.bounds.size.width, _swipeOverlay.bounds.size.height);
+    [_swipeOverlay addSubview:_leftView];
+}
+
+- (void) createRIghtViewWithButtons:(BOOL)content // if content is nil - the view is created without content
+{
+    [_rightView removeFromSuperview];
+    _rightView = [[MGSwipeButtonsView alloc] initWithButtons:(content) ? _rightButtons : nil direction:MGSwipeDirectionRightToLeft];
+    _rightView.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleHeight;
+    _rightView.cell = self;
+    _rightView.frame = CGRectMake(_swipeOverlay.bounds.size.width, 0, _rightView.bounds.size.width, _swipeOverlay.bounds.size.height);
+    [_swipeOverlay addSubview:_rightView];
 }
 
 
@@ -701,10 +707,10 @@ static NSMutableSet * singleSwipePerTable;
     else if (self.contentView.backgroundColor && ![self.contentView.backgroundColor isEqual:[UIColor clearColor]]) {
         return self.contentView.backgroundColor;
     }
-    else if (self.backgroundColor) {
+    else if (self.backgroundColor && ![self.backgroundColor isEqual:[UIColor clearColor]]) {
         return self.backgroundColor;
     }
-    return [UIColor clearColor];
+    return [UIColor whiteColor];
 }
 
 -(UITableView *) parentTable
@@ -778,7 +784,15 @@ static NSMutableSet * singleSwipePerTable;
         bool expand = expansions[i].buttonIndex >= 0 && offset > view.bounds.size.width * expansions[i].threshold;
         if (expand) {
             [view expandToOffset:offset button:expansions[i].buttonIndex];
-            _targetOffset = expansions[i].fillOnTrigger ? self.contentView.bounds.size.width * sign : 0;
+            // was self.contentview.bounds.size.width which is incorrect in case that the cell has accessor
+            _targetOffset = expansions[i].fillOnTrigger ? self.bounds.size.width * sign  : 0;
+            // when starting swipe to one side and continue to other, the second side complition might be
+            // swipe to end , so it care's that to slide to start
+            if (sign<0 && !_rightView.buttons)
+                _targetOffset = 0;
+            else if (sign>0 && !!activeButtons.buttons)
+                _targetOffset = 0;
+
             _activeExpansion = view;
             [self updateState:i ? MGSwipeStateExpandingRightToLeft : MGSwipeStateExpandingLeftToRight];
         }
@@ -818,29 +832,6 @@ static NSMutableSet * singleSwipePerTable;
     if (buttonsView) {
         CGFloat s = direction == MGSwipeDirectionLeftToRight ? 1.0 : -1.0;
         [self setSwipeOffset:buttonsView.bounds.size.width * s animated:animated completion:nil];
-    }
-}
-
--(void) expandSwipe: (MGSwipeDirection) direction animated: (BOOL) animated
-{
-    CGFloat s = direction == MGSwipeDirectionLeftToRight ? 1.0 : -1.0;
-    MGSwipeExpansionSettings* expSetting = direction == MGSwipeDirectionLeftToRight ? _leftExpansion : _rightExpansion;
-    
-    // only perform animation if there's no pending expansion animation and requested direction has fillOnTrigger enabled
-    if(!_activeExpansion && expSetting.fillOnTrigger) {
-        [self createSwipeViewIfNeeded];
-        _allowSwipeLeftToRight = _leftButtons.count > 0;
-        _allowSwipeRightToLeft = _rightButtons.count > 0;
-        UIView * buttonsView = direction == MGSwipeDirectionLeftToRight ? _leftView : _rightView;
-        
-        if (buttonsView) {
-            __weak typeof(_activeExpansion) w_expantionView = direction == MGSwipeDirectionLeftToRight ? _leftView : _rightView;
-            __weak typeof(self) weakself = self;
-            [self setSwipeOffset:buttonsView.bounds.size.width * s * expSetting.threshold * 2 animated:animated completion:^{
-                [w_expantionView endExpansioAnimated:YES];
-                [weakself setSwipeOffset:0 animated:NO completion:nil];
-            }];
-        }
     }
 }
 
@@ -906,13 +897,12 @@ static NSMutableSet * singleSwipePerTable;
         [self createSwipeViewIfNeeded];
         _panStartPoint = current;
         _panStartOffset = _swipeOffset;
-        [singleSwipePerTable addObject:[NSValue valueWithNonretainedObject:[self parentTable]]];
     }
     else if (gesture.state == UIGestureRecognizerStateChanged) {
         CGFloat offset = _panStartOffset + current.x - _panStartPoint.x;
         [self updateSwipe:offset];
     }
-    else {
+    else if (gesture.state == UIGestureRecognizerStateEnded) {
         MGSwipeButtonsView * expansion = _activeExpansion;
         if (expansion) {
             UIView * expandedButton = [expansion getExpandedButton];
@@ -940,7 +930,7 @@ static NSMutableSet * singleSwipePerTable;
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
     
     if (gestureRecognizer == _panRecognizer) {
-        
+        [self createSwipeViewIfNeeded];  // first swipe
         if (self.isEditing) {
             return NO; //do not swipe while editing table
         }
@@ -966,19 +956,26 @@ static NSMutableSet * singleSwipePerTable;
             _allowSwipeRightToLeft = [_delegate swipeTableCell:self canSwipe:MGSwipeDirectionRightToLeft];
         }
         else {
-            [self fetchButtonsIfNeeded];
-            _allowSwipeLeftToRight = _leftButtons.count > 0;
-            _allowSwipeRightToLeft = _rightButtons.count > 0;
+            _allowSwipeLeftToRight = YES;//_leftButtons.count > 0;  // like in iOS Mail
+            _allowSwipeRightToLeft = YES;//_rightButtons.count > 0;
+            if (translation.x > 0){
+                [self createLeftViewWithButtons:YES];
+                [self createRIghtViewWithButtons:NO];
+            }
+            else{
+                [self createLeftViewWithButtons:NO];
+                [self createRIghtViewWithButtons:YES];
+            }
         }
         if (!singleSwipePerTable) {
             singleSwipePerTable = [[NSMutableSet alloc] init];
         }
         NSValue * key = [NSValue valueWithNonretainedObject:[self parentTable]];
-        if ([singleSwipePerTable containsObject:key]) {
-            return NO;
+        BOOL result =  (_allowSwipeLeftToRight && translation.x > 0) || (_allowSwipeRightToLeft && translation.x < 0);
+        if (result) {
+            [singleSwipePerTable addObject:key];
         }
-        
-        return (_allowSwipeLeftToRight && translation.x > 0) || (_allowSwipeRightToLeft && translation.x < 0);
+        return result;
     }
     else if (gestureRecognizer == _tapRecognizer) {
         CGPoint point = [_tapRecognizer locationInView:_swipeView];
