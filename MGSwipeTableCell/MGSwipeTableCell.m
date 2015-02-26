@@ -234,8 +234,8 @@
     }
     
     if (fromExpansion) {
-        _expandedButton = nil;
-        _cell.swipeOffset = 0;
+//        _expandedButton = nil;
+//        _cell.swipeOffset = 0;
     }
     else if (autoHide) {
         [_cell hideSwipeAnimated:YES];
@@ -907,7 +907,7 @@ static NSMutableSet * singleSwipePerTable;
         if (expansion) {
             UIView * expandedButton = [expansion getExpandedButton];
             [self setSwipeOffset:_targetOffset animated:YES completion:^{
-                [expansion endExpansioAnimated:NO];
+//                [expansion endExpansioAnimated:NO];
                 [expansion handleClick:expandedButton fromExpansion:YES];
             }];
         }
