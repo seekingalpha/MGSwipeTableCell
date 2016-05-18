@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
   s.author   = { 'Imanol Fernandez' => 'mortimergoro@gmail.com' }
   s.homepage = 'https://github.com/MortimerGoro/MGSwipeTableCell'
   s.summary  = 'An easy to use UITableViewCell subclass that allows to display swippable buttons with a variety of transitions'
-  s.license  = 'MIT'
+  s.license  = { :type => 'MIT', :file => 'LICENSE' }
   s.source   = { :git => 'https://github.com/seekingalpha/MGSwipeTableCell.git', :tag => '1.3.7' }
   s.source_files = 'MGSwipeTableCell'
   s.platform = :ios
